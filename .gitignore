@@ -1,0 +1,11 @@
+.gradle/
+**/build/
+local.properties
+.idea/
+*.iml
+output/
+gazeup-upstream/
+app/src/main/assets/face_landmarker.task
+app/src/main/assets/NOTICE.md
+app/src/main/assets/*-MIT.txt
+app/src/main/assets/MediaPipe-APACHE-2.0.txt
