@@ -3,11 +3,12 @@ plugins {
  id("org.jetbrains.kotlin.android") version "2.0.21"
 }
 android {
- namespace = "dev.air2023.gazeg3"
+ namespace = "dev.xpfh.airgesture"
  compileSdk = 35
- defaultConfig { applicationId = "dev.air2023.gazeg3"; minSdk = 31; targetSdk = 33; versionCode = 4; versionName = "1.3-G3"; ndk { abiFilters += "arm64-v8a" } }
+ defaultConfig { applicationId = "dev.xpfh.airgesture"; minSdk = 31; targetSdk = 33; versionCode = 1; versionName = "1.0-A1"; ndk { abiFilters += "arm64-v8a" } }
  compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
  kotlinOptions { jvmTarget = "17" }
+ androidResources { noCompress += "task" }
 }
 dependencies {
  implementation("androidx.core:core-ktx:1.15.0")
