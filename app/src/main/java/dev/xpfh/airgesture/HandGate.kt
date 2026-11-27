@@ -5,13 +5,14 @@ import com.google.mediapipe.tasks.components.containers.NormalizedLandmark
 
 enum class Pose { NONE, OPEN, FIST, OTHER }
 enum class Action(val label:String,val output:String){
- UP("翻腕向上挥手","上滑"),DOWN("向下挥手","下滑"),PALM_BACK("手心翻向手背","返回"),BACK_PALM("手背翻向手心","中心单击"),LEFT("横向手心左挥翻手背","左滑"),RIGHT("横向手背右挥翻手心","右滑"),SHOT("握拳截屏","截屏")
+ UP("指尖向上转掌心","上滑"),DOWN("握拳张掌","下滑"),PALM_BACK("手心翻向手背","返回"),BACK_PALM("手背翻向手心","中心单击"),LEFT("横向手心左挥翻手背","左滑"),RIGHT("横向手背右挥翻手心","右滑"),SHOT("握拳截屏","截屏")
 }
 data class HandFrame(val at:Long,val pose:Pose,val x:Float=0f,val y:Float=0f,val face:Float=0f,val straight:Int=0,val curled:Int=0,val size:Float=0f,val fingerY:Float=0f,val tipY:Float=0f,val fingerX:Float=0f){
  val visible get()=pose!=Pose.NONE&&size>.045f
  val open get()=visible&&straight>=3&&curled<=1
- val upStart get()=visible&&straight>=1&&curled<=2&&abs(face)>=.30f&&fingerY>=.35f
- val upEnd get()=visible&&straight>=1&&curled<=2&&fingerY<=-.35f
+ val upStart get()=visible&&straight>=1&&curled<=2&&abs(face)<=.28f&&fingerY<=-.35f
+ val upEnd get()=open&&fingerY<=-.35f
+ val fistStart get()=visible&&pose==Pose.FIST&&curled>=3&&straight<=1
  val horizontal get()=visible&&abs(fingerX)>=.50f&&abs(fingerX)>=abs(fingerY)*1.15f
  val upright get()=visible&&fingerY<=-.35f
 }
@@ -51,14 +52,13 @@ data class Profile(val threshold:Float,val faceSign:Int=0,val endpoint:Float=0f,
 fun Action.isHorizontal()=this==Action.LEFT||this==Action.RIGHT
 fun Action.isFlip()=this==Action.PALM_BACK||this==Action.BACK_PALM||isHorizontal()
 fun Action.palmStart()=this==Action.PALM_BACK||this==Action.LEFT
-fun Action.startHint()=when(this){Action.UP->"手背朝镜头、指尖向下";Action.PALM_BACK->"手心朝镜头、指尖向上";Action.BACK_PALM->"手背朝镜头、指尖向上";Action.LEFT->"手心朝镜头、手指横向";Action.RIGHT->"手背朝镜头、手指横向";else->"张开手掌"}
+fun Action.startHint()=when(this){Action.UP->"指尖向上、手掌侧对镜头";Action.DOWN->"握拳，保持手部可见";Action.PALM_BACK->"手心朝镜头、指尖向上";Action.BACK_PALM->"手背朝镜头、指尖向上";Action.LEFT->"手心朝镜头、手指横向";Action.RIGHT->"手背朝镜头、手指横向";else->"张开手掌"}
 data class CalResult(val profile:Profile?,val message:String)
 class Calibration(val action:Action,val begin:Long){
  var status="请准备";private set
  var result:CalResult?=null;private set
  private var last=-1L;private var stable=-1L;private var start:HandFrame?=null
- private var endSince=-1L;private var endCount=0;private var motionAt=0L
- private var upPeak=0f
+ private var endSince=-1L;private var endCount=0;private var motionAt=0L;private var endpointSign=0
  private fun finish(p:Profile?,msg:String){result=CalResult(p,msg);status=msg}
  fun sample(f:HandFrame?,now:Long){
   if(result!=null)return
@@ -69,12 +69,12 @@ class Calibration(val action:Action,val begin:Long){
   if(gap){if(motionAt!=0L){finish(null,"画面中断 · 请重试");return};stable=-1;start=null}
   if(motionAt==0L){
    val old=start
-   val startOk=when{action==Action.UP->f.upStart;action.isHorizontal()->f.open&&f.horizontal&&abs(f.face)>=.38f;action.isFlip()->f.open&&f.upright&&abs(f.face)>=.38f;else->f.open&&abs(f.face)>=.48f}
+   val startOk=when{action==Action.UP->f.upStart;action==Action.DOWN->f.fistStart;action.isHorizontal()->f.open&&f.horizontal&&abs(f.face)>=.38f;action.isFlip()->f.open&&f.upright&&abs(f.face)>=.38f;else->f.open&&abs(f.face)>=.48f}
    if(!startOk){stable=-1;start=null;status="起始："+action.startHint();return}
-   if(old==null||hypot(f.x-old.x,f.y-old.y)>.055f||old.face*f.face<0){stable=now;start=f}
-   val wait=if(action==Action.UP)300L else 500L
-   if(now-stable<wait){status=(if(action==Action.UP)"手背起始确认 · " else "起始姿势确认 · ")+((now-stable)*100/wait).coerceIn(0,100)+"%";return}
-   start=f;motionAt=now;status=if(action==Action.UP)"现在：向上翻腕，手心朝镜头、指尖向上" else "现在："+action.label+"，到终点保持片刻";return
+   if(old==null||hypot(f.x-old.x,f.y-old.y)>.055f||(action!=Action.UP&&action!=Action.DOWN&&old.face*f.face<0)){stable=now;start=f}
+   val wait=if(action==Action.UP||action==Action.DOWN)300L else 500L
+   if(now-stable<wait){status="起始姿势确认 · "+((now-stable)*100/wait).coerceIn(0,100)+"%";return}
+   start=f;motionAt=now;status=when(action){Action.UP->"现在：指尖保持向上，转至掌心朝镜头";Action.DOWN->"现在：张开手掌，让掌心朝镜头";else->"现在："+action.label+"，到终点保持片刻"};return
   }
   val a=start?:return
   if(now-motionAt>4500){finish(null,"动作未达到校准条件 · 请重试");return}
@@ -82,19 +82,21 @@ class Calibration(val action:Action,val begin:Long){
   val dx=f.x-a.x;val dy=f.y-a.y
   val scaleRatio=f.size/a.size
   val sign=if(a.face>=0)1 else -1
-  if(action==Action.UP){
-   val rise=a.tipY-f.tipY
-   val reversed=f.face*sign<=-.30f
-   val valid=scaleRatio in .40f..2.3f&&f.upEnd&&reversed&&rise>=.025f
-   if(!valid){endCount=0;status=when{f.fingerY>-.35f->"翻腕中 · 请将指尖翻向上方";!reversed->"终点：请让手心面对镜头";else->"请向上挥动指尖，保持手部可见"};return}
-   endCount++;upPeak=maxOf(upPeak,rise)
-   status="手心朝前 · 指尖向上 · 确认 "+endCount+"/2"
-   if(endCount>=2)finish(Profile((upPeak*.40f).coerceIn(.018f,.22f),sign,(minOf(abs(a.face),abs(f.face))*.65f).coerceIn(.25f,.60f),now-motionAt),"翻腕向上挥手 校准成功")
+  if(action==Action.UP||action==Action.DOWN){
+   val valid=scaleRatio in .40f..2.3f&&abs(f.face)>=.45f&&
+    (if(action==Action.UP)f.upEnd else f.open)
+   if(!valid){endCount=0;endSince=-1;status=if(action==Action.UP)"指尖保持向上 · 转至掌心面对镜头" else "请张开手掌 · 掌心面对镜头";return}
+   if(endSince<0||endCount==0){endSince=now;endCount=0}
+   // Require a consistent endpoint sign across consecutive frames.
+   val endSign=if(f.face>0)1 else -1
+   if(endCount>0&&endpointSign!=endSign){endCount=0;endSince=now}
+   endpointSign=endSign;endCount++
+   status="掌心终点确认 · "+endCount+"/3"
+   if(endCount>=3&&now-endSince>=150)finish(Profile((abs(f.face)*.70f).coerceIn(.35f,.65f),endSign,0f,now-motionAt),action.label+" 校准成功")
    return
   }
   val valid=scaleRatio in .45f..2.0f&&when(action){
-   Action.UP->false
-   Action.DOWN->f.open&&dy>.065f&&abs(dy)>abs(dx)*.8f&&f.face*sign>.18f
+   Action.UP,Action.DOWN->false
    Action.PALM_BACK,Action.BACK_PALM->f.open&&f.upright&&f.face*sign<-.38f&&hypot(dx,dy)<=.08f
    Action.LEFT,Action.RIGHT->f.open&&f.horizontal&&f.face*sign<-.38f&&(if(action==Action.LEFT)-dx else dx)>=.10f&&abs(dx)>=abs(dy)*1.25f
    Action.SHOT->f.curled>=3&&f.straight<=1&&hypot(dx,dy)<maxOf(.18f,a.size*1.8f)
@@ -104,8 +106,7 @@ class Calibration(val action:Action,val begin:Long){
   endCount++;status="终点确认 · 保持姿势"
   if(now-endSince<220||endCount<3)return
   val p=when(action){
-   Action.UP->error("UP handled separately")
-   Action.DOWN->Profile((abs(dy)*.58f).coerceIn(.045f,.32f),0,abs(dx)/(abs(dy).coerceAtLeast(.01f)),now-motionAt)
+   Action.UP,Action.DOWN->error("Pose transitions handled separately")
    Action.PALM_BACK,Action.BACK_PALM->Profile((minOf(abs(a.face),abs(f.face))*.65f).coerceIn(.25f,.65f),sign,(hypot(dx,dy)*1.4f+.025f).coerceIn(.04f,.085f),now-motionAt)
    Action.LEFT,Action.RIGHT->Profile((abs(dx)*.65f).coerceIn(.085f,.32f),sign,(minOf(abs(a.face),abs(f.face))*.65f).coerceIn(.25f,.65f),now-motionAt)
    Action.SHOT->Profile(f.curled.toFloat().coerceIn(3f,4f),0,0f,now-motionAt)
@@ -114,14 +115,14 @@ class Calibration(val action:Action,val begin:Long){
  }
 }
 class HandGate(private val profiles:Map<Action,Profile>,private val screenshot:Boolean=false,private val hold:Long=330L){
- var status="请张开单手并停稳";private set
+ var status="请摆出手势起始姿势并停稳";private set
  private var last=-1L;private var since=-1L;private var armed=-1L
  private var neutral=-1L;private var cooldown=0L;private var needNeutral=false
  private var anchor:HandFrame?=null;private var candidate:Action?=null;private var candidateAt=0L;private var hits=0
- private var smoothX=0f;private var smoothY=0f;private var lastFace=0f;private var crossed=false;private var verticalLock=false
- private var upOnly=false;private var upHits=0
+ private var smoothX=0f;private var smoothY=0f;private var lastFace=0f;private var crossed=false
+ private var upOnly=false;private var downOnly=false;private var upHits=0
  private var horizontalOnly=false;private var maxTravel=0f
- fun reset(){last=-1;since=-1;armed=-1;neutral=-1;anchor=null;candidate=null;hits=0;crossed=false;verticalLock=false;upOnly=false;upHits=0;horizontalOnly=false;maxTravel=0f;status="请张开单手并停稳"}
+ fun reset(){last=-1;since=-1;armed=-1;neutral=-1;anchor=null;candidate=null;hits=0;crossed=false;upOnly=false;downOnly=false;upHits=0;horizontalOnly=false;maxTravel=0f;status="请摆出手势起始姿势并停稳"}
  private fun finish(a:Action,now:Long):Action{reset();needNeutral=true;cooldown=now+1100;status="已识别 "+a.label;return a}
  fun sample(f:HandFrame,now:Long):Action?{
   if(f.at<=last)return null
@@ -130,42 +131,36 @@ class HandGate(private val profiles:Map<Action,Profile>,private val screenshot:B
   last=f.at
   if(needNeutral){status="请移开手掌 · 等待冷却";if(!f.visible){if(neutral<0)neutral=now;if(now-neutral>=300&&now>=cooldown){needNeutral=false;reset()}}else neutral=-1;return null}
   if(armed<0){
-   val up=profiles[Action.UP]
-   val canUp=up!=null&&up.faceSign!=0&&f.upStart&&f.face*up.faceSign>=maxOf(.30f,up.endpoint)
+   val canUp=profiles[Action.UP]?.faceSign in listOf(-1,1)&&f.upStart
+   val canDown=profiles[Action.DOWN]?.faceSign in listOf(-1,1)&&f.fistStart
    val normal=f.open&&abs(f.face)>=.30f
-   if(!normal&&!canUp){since=-1;anchor=null;status="等待手掌 · 上挥请手背朝前、指尖向下";return null}
+   if(!normal&&!canUp&&!canDown){since=-1;anchor=null;status="等待起始姿势 · 侧掌指尖向上 / 握拳 / 张掌";return null}
    val a=anchor
-   if(a==null||hypot(f.x-a.x,f.y-a.y)>.065f||a.face*f.face<0||(a.fingerY>=.35f)!=(f.fingerY>=.35f)||a.horizontal!=f.horizontal){since=now;anchor=f}
-   status="已识别手掌 · 保持不动 "+((now-since)*100/(if(canUp)minOf(hold,250L) else hold)).coerceIn(0,100)+"%"
-   val dwell=if(canUp)minOf(hold,250L) else hold
-   if(now-since>=dwell){anchor=f;armed=now;upOnly=canUp;horizontalOnly=f.horizontal&&!canUp;maxTravel=0f;smoothX=f.x;smoothY=f.y;lastFace=f.face;status=if(canUp)"已就绪 · 翻腕向上，指尖朝上" else if(horizontalOnly)"已就绪 · 横向挥动并翻面" else "已就绪 · 下挥 / 原地翻掌"}
+   if(a==null||hypot(f.x-a.x,f.y-a.y)>.065f||a.upStart!=f.upStart||a.fistStart!=f.fistStart||(!canUp&&!canDown&&a.face*f.face<0)||a.horizontal!=f.horizontal){since=now;anchor=f}
+   val dwell=if(canUp||canDown)minOf(hold,250L) else hold
+   status="起始姿势确认 · "+((now-since)*100/dwell).coerceIn(0,100)+"%"
+   if(now-since>=dwell){anchor=f;armed=now;upOnly=canUp;downOnly=canDown;horizontalOnly=f.horizontal&&!canUp&&!canDown;maxTravel=0f;smoothX=f.x;smoothY=f.y;lastFace=f.face;status=when{canUp->"已就绪 · 指尖向上，转至掌心朝前";canDown->"已就绪 · 张开手掌，掌心朝前";horizontalOnly->"已就绪 · 横向挥动并翻面";else->"已就绪 · 原地翻掌 / 握拳"}}
    return null
   }
   val a=anchor?:run{reset();return null}
   if(now-armed>3200){reset();needNeutral=true;cooldown=now;status="超时 · 请移开手掌";return null}
   if(!f.visible){candidate=null;hits=0;upHits=0;status="手掌暂时丢失 · 请保持在镜头内";return null}
-  val up=profiles[Action.UP]
-  val upArmed=upOnly&&up!=null&&up.faceSign!=0&&a.upStart&&a.face*up.faceSign>=maxOf(.30f,up.endpoint)
-  if(f.size/a.size !in (if(upArmed).40f..2.3f else .45f..2.0f)){reset();return null}
+  if(f.size/a.size !in (if(upOnly||downOnly).40f..2.3f else .45f..2.0f)){reset();return null}
   smoothX=.35f*smoothX+.65f*f.x;smoothY=.35f*smoothY+.65f*f.y
   val dx=smoothX-a.x;val dy=smoothY-a.y;val sign=if(a.face>=0)1 else -1
   maxTravel=maxOf(maxTravel,hypot(f.x-a.x,f.y-a.y))
-  // Fingers-down start reserves the entire sequence for UP: never emits a horizontal flip.
-  if(upArmed&&up!=null){
-   val rise=a.tipY-f.tipY
-   val reversed=f.face*up.faceSign<=-up.endpoint
-   val valid=f.upEnd&&reversed&&rise>=up.threshold
+  // Reserve a side-on upward-finger or closed-fist start for its own transition.
+  if(upOnly||downOnly){
+   val act=if(upOnly)Action.UP else Action.DOWN
+   val profile=profiles[act]
+   val valid=profile!=null&&profile.faceSign in listOf(-1,1)&&f.face*profile.faceSign>=profile.threshold&&(if(upOnly)f.upEnd else f.open)
    if(valid)upHits++ else upHits=0
-   if(upHits>=2)return finish(Action.UP,now)
-   status=when{valid->"上挥终点已识别 · "+upHits+"/2";f.fingerY>-.35f->"已就绪 · 翻腕向上，指尖朝上";!reversed->"上挥中 · 请让手心朝向镜头";else->"上挥中 · 请继续向上挥动"}
+   if(upHits>=2)return finish(act,now)
+   status=if(valid)"掌心终点确认 · "+upHits+"/2" else if(upOnly)"已就绪 · 指尖向上，转至掌心朝前" else "已就绪 · 张开手掌，掌心朝前"
    return null
   }
-  if(upOnly){status="请重新摆出上挥起始姿势";return null}
   if(abs(f.face)<.30f||lastFace*f.face<0)crossed=true
   lastFace=f.face
-  val vertical=if(dy<0)Action.UP else Action.DOWN
-  val vp=if(vertical==Action.DOWN)profiles[vertical] else null
-  if(vp!=null&&abs(dy)>vp.threshold*.70f&&abs(dy)>abs(dx)*1.05f&&!crossed&&f.face*sign>.20f)verticalLock=true
   val flip=profiles.entries.firstOrNull{(act,p)->act in listOf(Action.PALM_BACK,Action.BACK_PALM)&&p.faceSign==sign&&abs(a.face)>=p.threshold&&f.face*sign<=-p.threshold&&a.upright&&f.upright&&maxTravel<=p.endpoint}
   val lateral=if(dx<0)Action.LEFT else Action.RIGHT
   val lp=profiles[lateral]
@@ -174,11 +169,10 @@ class HandGate(private val profiles:Map<Action,Profile>,private val screenshot:B
   val next=when{
    !horizontalOnly&&screenshot&&shot!=null&&f.curled>=shot.threshold.toInt()&&f.straight<=1&&hypot(dx,dy)<maxOf(.15f,a.size*1.7f)->Action.SHOT
    horizontalMatch->lateral
-   !horizontalOnly&&f.open&&!verticalLock&&crossed&&flip!=null->flip.key
-   !horizontalOnly&&f.open&&!crossed&&vp!=null&&f.face*sign>.20f&&abs(dy)>=vp.threshold&&abs(dy)>abs(dx)*maxOf(1.05f,1.25f-vp.endpoint*.20f)->vertical
+   !horizontalOnly&&f.open&&crossed&&flip!=null->flip.key
    else->null
   }
-  if(next==null){candidate=null;hits=0;status=when{horizontalOnly->"横向翻腕 · "+(if(lp!=null)(abs(dx)*100/lp.threshold).toInt().coerceIn(0,100).toString()+"%" else "请先校准该方向");crossed->"原地翻掌 · 请保持终点朝向";vp!=null&&abs(dy)>vp.threshold*.25f->"上下挥动 · "+(abs(dy)*100/vp.threshold).toInt().coerceIn(0,100)+"%";else->"已就绪 · 上下挥手 / 翻掌"};return null}
+  if(next==null){candidate=null;hits=0;status=when{horizontalOnly->"横向翻腕 · "+(if(lp!=null)(abs(dx)*100/lp.threshold).toInt().coerceIn(0,100).toString()+"%" else "请先校准该方向");crossed->"原地翻掌 · 请保持终点朝向";else->"已就绪 · 原地翻掌 / 握拳"};return null}
   if(candidate!=next){candidate=next;candidateAt=now;hits=1}else hits++
   val duration=when(next){Action.SHOT->500L;Action.PALM_BACK,Action.BACK_PALM->260L;Action.LEFT,Action.RIGHT->120L;else->75L}
   status=next.label+" · 确认 "+((now-candidateAt)*100/duration).coerceIn(0,100)+"%"

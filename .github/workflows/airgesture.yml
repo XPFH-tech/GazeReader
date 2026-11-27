@@ -1,4 +1,4 @@
-name: AirGesture A3 signed compatibility
+name: AirGesture A4 signed compatibility
 on:
   workflow_dispatch:
   push:
@@ -34,15 +34,15 @@ jobs:
       - name: Verify APK
         run: |
           mkdir -p output
-          cp app/build/outputs/apk/debug/app-debug.apk output/AirGesture-A3-Signed.apk
+          cp app/build/outputs/apk/debug/app-debug.apk output/AirGesture-A4-Signed.apk
           BT="$ANDROID_HOME/build-tools/35.0.0"
-          "$BT/apksigner" verify --verbose --print-certs output/AirGesture-A3-Signed.apk
-          "$BT/apksigner" verify --min-sdk-version 23 --verbose --print-certs output/AirGesture-A3-Signed.apk > output/signature.txt
+          "$BT/apksigner" verify --verbose --print-certs output/AirGesture-A4-Signed.apk
+          "$BT/apksigner" verify --min-sdk-version 23 --verbose --print-certs output/AirGesture-A4-Signed.apk > output/signature.txt
           cat output/signature.txt
           grep -F 'Verified using v1 scheme (JAR signing): true' output/signature.txt
           grep -F 'Verified using v2 scheme (APK Signature Scheme v2): true' output/signature.txt
           grep -F 'Number of signers: 1' output/signature.txt
-          "$BT/aapt2" dump badging output/AirGesture-A3-Signed.apk > output/manifest.txt
+          "$BT/aapt2" dump badging output/AirGesture-A4-Signed.apk > output/manifest.txt
           grep -F "package: name='dev.xpfh.airgesture'" output/manifest.txt
           if grep -E "uses-permission.*android.permission.(INTERNET|ACCESS_NETWORK_STATE)" output/manifest.txt; then exit 1; fi
           cp README.md output/
@@ -51,7 +51,7 @@ jobs:
           (cd output && sha256sum *.apk > SHA256SUMS.txt)
       - uses: actions/upload-artifact@v4
         with:
-          name: AirGesture-A3-Signed
+          name: AirGesture-A4-Signed
           path: output/
           retention-days: 7
           if-no-files-found: error

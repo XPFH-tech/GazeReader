@@ -13,7 +13,7 @@ android {
    enableV4Signing = false
   }
  }
- defaultConfig { applicationId = "dev.xpfh.airgesture"; minSdk = 31; targetSdk = 33; versionCode = 6; versionName = "3.0-A3"; ndk { abiFilters += "arm64-v8a" } }
+ defaultConfig { applicationId = "dev.xpfh.airgesture"; minSdk = 31; targetSdk = 33; versionCode = 7; versionName = "4.0-A4"; ndk { abiFilters += "arm64-v8a" } }
  compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
  kotlinOptions { jvmTarget = "17" }
  androidResources { noCompress += "task" }

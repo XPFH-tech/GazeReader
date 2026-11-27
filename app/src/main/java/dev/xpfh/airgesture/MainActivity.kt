@@ -58,7 +58,7 @@ class MainActivity:Activity(){
         speed=Spinner(this);speed.adapter=ArrayAdapter(this,android.R.layout.simple_spinner_dropdown_item,arrayOf("250 ms（快）","330 ms（推荐）","500 ms（稳）"));speed.setSelection(prefs.getInt("holdA2",1).coerceIn(0,2));p.addView(speed)
         text("3. 独立校准（不派发任何动作）",20f)
         calibrationStatus=text("未校准",16f)
-        text("上挥：手背朝镜头、指尖向下 → 手心朝镜头、指尖向上。原地翻掌（返回/点击）：指尖向上，不横移。横向翻腕（左/右滑）：手指横向，整手向对应方向挥动并翻面。请用同一只手，校准随方向保存。")
+        text("上滑：指尖向上、手掌侧对镜头 → 指尖仍向上、掌心朝镜头。下滑：直接握拳就绪 → 张开手掌、掌心朝镜头。原地翻掌（返回/点击）：指尖向上，不横移。横向翻腕（左/右滑）：手指横向，整手向对应方向挥动并翻面。请用同一只手，校准随方向保存。")
         for(a in Action.entries){val b=Button(this).apply{text="校准 "+a.label+" → "+a.output;setOnClickListener{beginCalibration(a)}};calButtons[a]=b;p.addView(b)}
         button("清除当前方向校准"){AlertDialog.Builder(this).setTitle("清除七项校准？").setPositiveButton("清除"){_,_->Session.pause();Profiles.clear(this,rotation(this));Session.profiles=emptyMap();Session.calMessage="已清除当前方向校准"}.setNegativeButton("取消",null).show()}
         shot=CheckBox(this).apply{text="允许张掌就绪后握拳截屏（默认关闭）";isChecked=false};p.addView(shot)
@@ -84,7 +84,7 @@ class MainActivity:Activity(){
         }
         button("暂停手势（相机仍运行）"){Session.pause();HandAccess.current?.hide()}
         button("停止相机与手势"){Session.pause();stopService(Intent(this,TrackingService::class.java));Session.status="已停止"}
-        button("复制诊断信息"){(getSystemService(CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("AirGesture A3",live.text.toString()+"\n"+status.text+"\n"+Session.diagnostic+"\n"+Session.report()));toast("已复制")}
+        button("复制诊断信息"){(getSystemService(CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("AirGesture A4",live.text.toString()+"\n"+status.text+"\n"+Session.diagnostic+"\n"+Session.report()));toast("已复制")}
         text("请将平板固定，手距相机约30–60cm开始测试，手掌完整可见。截图调用系统功能，可能被系统或应用拒绝；请勿用于敏感页面。锁屏、过热或相机异常自动停止。旋转会重新打开相机并读取该方向校准；未校准暂停。全局模式尝试控制当前活动应用窗口（包括桌面及分屏），系统授权、支付等敏感窗口、键盘、覆盖及过小窗口暂停。系统截屏限制不会被绕过。")
         setContentView(ScrollView(this).apply{addView(p)})
     }
