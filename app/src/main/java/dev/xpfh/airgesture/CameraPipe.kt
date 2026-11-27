@@ -42,7 +42,7 @@ class CameraPipe(private val ctx:Context,private val owner:LifecycleOwner,privat
     private fun analyze(img:ImageProxy){
         var raw:Bitmap?=null;var rotated:Bitmap?=null
         try{
-            val now=SystemClock.elapsedRealtime();if(closed||now-last<95)return;last=now
+            val now=SystemClock.elapsedRealtime();if(closed||now-last<65)return;last=now
             val p=img.planes[0];val w=img.width;val h=img.height
             if(p.pixelStride!=4||p.rowStride<w*4)throw IllegalStateException("RGBA stride")
             val packed=ByteBuffer.allocateDirect(w*h*4);val b=p.buffer.duplicate()
