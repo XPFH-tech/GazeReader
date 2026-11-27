@@ -1,4 +1,4 @@
-name: AirGesture A2
+name: AirGesture A2R1
 on:
   workflow_dispatch:
   push:
@@ -34,10 +34,10 @@ jobs:
       - name: Verify APK
         run: |
           mkdir -p output
-          cp app/build/outputs/apk/debug/app-debug.apk output/AirGesture-A2.apk
+          cp app/build/outputs/apk/debug/app-debug.apk output/AirGesture-A2R1.apk
           BT="$ANDROID_HOME/build-tools/35.0.0"
-          "$BT/apksigner" verify --verbose output/AirGesture-A2.apk
-          "$BT/aapt2" dump badging output/AirGesture-A2.apk > output/manifest.txt
+          "$BT/apksigner" verify --verbose output/AirGesture-A2R1.apk
+          "$BT/aapt2" dump badging output/AirGesture-A2R1.apk > output/manifest.txt
           grep -F "package: name='dev.xpfh.airgesture'" output/manifest.txt
           if grep -E "uses-permission.*android.permission.(INTERNET|ACCESS_NETWORK_STATE)" output/manifest.txt; then exit 1; fi
           cp README.md output/
@@ -46,7 +46,7 @@ jobs:
           (cd output && sha256sum *.apk > SHA256SUMS.txt)
       - uses: actions/upload-artifact@v4
         with:
-          name: AirGesture-A2
+          name: AirGesture-A2R1
           path: output/
           retention-days: 7
           if-no-files-found: error

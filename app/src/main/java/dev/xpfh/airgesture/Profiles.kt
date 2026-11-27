@@ -8,7 +8,7 @@ object Profiles {
    val k=key(rot,a)
    if(!p.contains(k+"_t"))null else{
     val t=p.getFloat(k+"_t",0f);val sign=p.getInt(k+"_s",0);val e=p.getFloat(k+"_e",0f);val d=p.getLong(k+"_d",0)
-    val valid=t.isFinite()&&e.isFinite()&&when(a){Action.UP,Action.DOWN->t in .045f.. .32f;Action.PALM_BACK,Action.BACK_PALM->t in .30f.. .70f&&sign in listOf(-1,1);Action.SHOT->t in 3f..4f}
+    val valid=t.isFinite()&&e.isFinite()&&when(a){Action.UP->t in .035f.. .24f&&sign in listOf(-1,1);Action.DOWN->t in .045f.. .32f;Action.PALM_BACK,Action.BACK_PALM->t in .30f.. .70f&&sign in listOf(-1,1);Action.SHOT->t in 3f..4f}
     if(valid)a to Profile(t,sign,e,d) else null
    }
   }.toMap()
