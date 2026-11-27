@@ -123,8 +123,7 @@ class HandAccess:AccessibilityService(){
             Action.LEFT->{p.moveTo(x(.72f),y(.50f));p.lineTo(x(.30f),y(.50f))}
             Action.RIGHT->{p.moveTo(x(.28f),y(.50f));p.lineTo(x(.70f),y(.50f))}
             Action.BACK_PALM->p.moveTo(x(.50f),y(.50f))
-            Action.UP->{p.moveTo(x(.50f),y(.73f));p.lineTo(x(.50f),y(.31f))}
-            Action.DOWN->{p.moveTo(x(.50f),y(.30f));p.lineTo(x(.50f),y(.72f))}
+            Action.UP,Action.DOWN->{val swipe=a.verticalSwipeY()?:return;p.moveTo(x(.50f),y(swipe.first));p.lineTo(x(.50f),y(swipe.second))}
             else->return
         }
         busy=true;val generation=Session.epoch
@@ -140,6 +139,7 @@ class TrackingService:LifecycleService(){
     private val h=Handler(Looper.getMainLooper());private var pipe:CameraPipe?=null
     private var rot=0;private var started=0L;private var epoch=-1L;private var gate:HandGate?=null
     private var blocked=true;private var activeKey="";private var generation=0
+    private val hintWindow=GestureHintWindow()
     private fun openCamera(){
         val gen=++generation
         Session.frame=null;started=SystemClock.elapsedRealtime()
@@ -150,17 +150,17 @@ class TrackingService:LifecycleService(){
         if(!Session.running)return
         val now=SystemClock.elapsedRealtime()
         if(rotation(this@TrackingService)!=rot){
-            rot=rotation(this@TrackingService);Session.cameraRot=rot;Session.calibration=null;Session.profiles=Profiles.load(this@TrackingService,rot);Session.epoch++;gate=null;blocked=true;activeKey="";Session.feedbackUntil=0
+            rot=rotation(this@TrackingService);Session.cameraRot=rot;Session.calibration=null;Session.profiles=Profiles.load(this@TrackingService,rot);Session.epoch++;gate=null;blocked=true;activeKey="";Session.feedbackUntil=0;hintWindow.reset()
             generation++;pipe?.stop();pipe=null;Session.frame=null;Session.status="方向变化 · 正在重新打开相机";HandAccess.current?.hide();openCamera();h.postDelayed(this,200);return
         }
         if(getSystemService(KeyguardManager::class.java).isKeyguardLocked){stopNow("锁屏 · 已停止");return}
         if(getSystemService(PowerManager::class.java).currentThermalStatus>=PowerManager.THERMAL_STATUS_SEVERE){stopNow("温度过高 · 已停止");return}
         val f=Session.frame;val access=HandAccess.current
         if((f==null&&now-started>15000)||(f!=null&&now-f.at>5000)){stopNow("相机无新画面 · 已停止");return}
-        if(epoch!=Session.epoch){epoch=Session.epoch;gate=null;blocked=true}
+        if(epoch!=Session.epoch){epoch=Session.epoch;gate=null;blocked=true;hintWindow.reset()}
         val cal=Session.calibration
         if(cal!=null){
-            access?.hide();cal.sample(f,now);Session.status=cal.status
+            hintWindow.reset();access?.hide();cal.sample(f,now);Session.status=cal.status
             cal.result?.let{result->
                 val v=result.profile
                 Session.calMessage=if(v!=null){if(Profiles.save(this@TrackingService,rot,cal.action,v)){Session.profiles=Profiles.load(this@TrackingService,rot);result.message}else "校准未保存 · 翻掌起始方向冲突或写入失败，请用同一只手重校"}else result.message
@@ -171,19 +171,21 @@ class TrackingService:LifecycleService(){
         val test=Session.enabled&&Session.test
         val targetOk=Session.enabled&&!test&&access?.bounds(Session.target)!=null
         val key=if(test)"test" else if(targetOk)access?.windowKey?:"" else ""
-        if(key!=activeKey){gate=null;blocked=true;activeKey=key;Session.feedbackUntil=0}
+        if(key!=activeKey){gate=null;blocked=true;activeKey=key;Session.feedbackUntil=0;hintWindow.reset()}
         val allowed=Session.enabled&&now>=Session.after&&Session.profiles.isNotEmpty()&&(test||targetOk)
         if(!allowed||f==null||now-f.at>500){
             if(!blocked){gate=null;blocked=true}
             Session.status=when{!Session.enabled->if(f==null)"正在启动前置相机" else "相机已就绪 · 请启用识别测试或控制";Session.profiles.isEmpty()->"暂停 · 当前方向尚未校准";now<Session.after->"即将启用 · 请准备";access==null&&!test->"暂停 · 无障碍未连接";!allowed->"暂停 · "+Session.diagnostic;else->"等待相机新画面"}
-            if(Session.enabled&&!test&&access?.targetActive==true)access.show(Session.status) else access?.hide()
+            hintWindow.reset();access?.hide()
         }else{
             if(blocked||gate==null){gate=HandGate(Session.profiles,Session.screenshot,Session.hold);blocked=false}
             val g=gate!!
             val action=g.sample(f,now)
             if(action!=null){Session.detected++;if(test)Session.feedback("识别测试："+action.label+" → "+action.output+"（未执行）") else access?.send(Session.target,action,key)}
             Session.status=g.status
-            if(!test)access?.show(if(now<Session.feedbackUntil)Session.last+"\n请移开手掌，等待下一次识别" else Session.status+(if(g.status.startsWith("已就绪")&&Session.screenshot)"\n也可握拳截屏" else "")) else access?.hide()
+            val activityAt=if(g.hintActive&&f.visible)f.at else null
+            val showHint=hintWindow.shouldShow(now,activityAt,Session.feedbackUntil)
+            if(!test&&showHint&&Session.overlay)access?.show(if(now<Session.feedbackUntil)Session.last+"\n请移开手掌，等待下一次识别" else Session.status) else access?.hide()
         }
         h.postDelayed(this,80)
     }}

@@ -29,5 +29,10 @@ class HandGateTest{
  @Test fun horizontalStationaryNoClick(){val g=HandGate(p);horizontalArm(g,-.85f);for(t in 600L..1300L step 100)assertNull(g.sample(f(t,face=.8f,finger=.05f,fx=.9f),t))}
  @Test fun uprightLargeTravelNoBack(){val g=HandGate(p);arm(g);for(t in 600L..1300L step 100)assertNull(g.sample(f(t,x=.25f,face=-.8f),t))}
  @Test fun horizontalCalibration(){val c=Calibration(Action.LEFT,0);for(t in 1500L..2000L step 100)c.sample(f(t,finger=.05f,fx=.9f),t);for(t in 2100L..2400L step 100)c.sample(f(t,x=.28f,face=-.8f,finger=.05f,fx=.9f),t);assertEquals(1,c.result?.profile?.faceSign)}
+ @Test fun verticalMappingsSwapped(){assertEquals("下滑",Action.UP.output);assertEquals("上滑",Action.DOWN.output);val down=Action.UP.verticalSwipeY()!!;val up=Action.DOWN.verticalSwipeY()!!;assertTrue(down.first<down.second);assertTrue(up.first>up.second);assertNull(Action.LEFT.verticalSwipeY())}
+ @Test fun hintsInitiallyHiddenAndExpire(){val h=GestureHintWindow();assertFalse(h.shouldShow(1000,null,0));assertTrue(h.shouldShow(1100,1100,0));assertTrue(h.shouldShow(3099,null,0));assertFalse(h.shouldShow(3100,null,0));assertTrue(h.shouldShow(3200,3200,0));h.reset();assertFalse(h.shouldShow(3300,null,0))}
+ @Test fun staleFrameDoesNotExtendHints(){val h=GestureHintWindow();assertTrue(h.shouldShow(1000,1000,0));assertTrue(h.shouldShow(1500,1000,0));assertFalse(h.shouldShow(3000,1000,0))}
+ @Test fun resultFeedbackSurvivesIdle(){val h=GestureHintWindow();assertTrue(h.shouldShow(2000,null,4200));assertTrue(h.shouldShow(4199,null,4200));assertFalse(h.shouldShow(4200,null,4200))}
+ @Test fun gestureStartShowsHintThenRecognitionEndsActivity(){val g=HandGate(p);assertFalse(g.hintActive);arm(g,.05f);assertTrue(g.hintActive);g.sample(f(600,face=.8f),600);assertEquals(Action.UP,g.sample(f(700,face=.8f),700));assertFalse(g.hintActive)}
  @Test fun mappings(){assertEquals("返回",Action.PALM_BACK.output);assertEquals("中心单击",Action.BACK_PALM.output);assertEquals("左滑",Action.LEFT.output);assertEquals("右滑",Action.RIGHT.output)}
 }

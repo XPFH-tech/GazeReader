@@ -45,8 +45,8 @@ class MainActivity:Activity(){
         val p=LinearLayout(this).apply{orientation=1;setPadding(28,28,28,28)}
         fun text(s:String,n:Float=15f)=TextView(this).apply{text=s;textSize=n;p.addView(this)}
         fun button(s:String,action:()->Unit){p.addView(Button(this).apply{text=s;setOnClickListener{action()}})}
-        text("AirGesture 隔空手势 A3",25f)
-        text("本地手部识别 · 无需 Root。停止 GazeReader 相机后再使用。先完成七种手势的独立校准；同一方向使用同一只手。张掌停稳后上下挥手、翻掌或握拳，动作后移开手掌。")
+        text("AirGesture 隔空手势 A4R1",25f)
+        text("本地手部识别 · 无需 Root。停止 GazeReader 相机后再使用。先完成七种手势的独立校准；同一方向使用同一只手。摆出对应手势的起始姿势并停稳，动作后移开手掌。")
         live=text(Session.status,23f);live.gravity=android.view.Gravity.CENTER;live.setPadding(16,28,16,28);live.background=android.graphics.drawable.GradientDrawable().apply{cornerRadius=18*resources.displayMetrics.density;setColor(0xffedf3f7.toInt())}
         status=text("",15f)
         button("1. 启用隔空手势无障碍"){startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))}
@@ -58,11 +58,11 @@ class MainActivity:Activity(){
         speed=Spinner(this);speed.adapter=ArrayAdapter(this,android.R.layout.simple_spinner_dropdown_item,arrayOf("250 ms（快）","330 ms（推荐）","500 ms（稳）"));speed.setSelection(prefs.getInt("holdA2",1).coerceIn(0,2));p.addView(speed)
         text("3. 独立校准（不派发任何动作）",20f)
         calibrationStatus=text("未校准",16f)
-        text("上滑：指尖向上、手掌侧对镜头 → 指尖仍向上、掌心朝镜头。下滑：直接握拳就绪 → 张开手掌、掌心朝镜头。原地翻掌（返回/点击）：指尖向上，不横移。横向翻腕（左/右滑）：手指横向，整手向对应方向挥动并翻面。请用同一只手，校准随方向保存。")
+        text("下滑：指尖向上、手掌侧对镜头 → 指尖仍向上、掌心朝镜头。上滑：直接握拳就绪 → 张开手掌、掌心朝镜头。原地翻掌（返回/点击）：指尖向上，不横移。横向翻腕（左/右滑）：手指横向，整手向对应方向挥动并翻面。请用同一只手，校准随方向保存。")
         for(a in Action.entries){val b=Button(this).apply{text="校准 "+a.label+" → "+a.output;setOnClickListener{beginCalibration(a)}};calButtons[a]=b;p.addView(b)}
         button("清除当前方向校准"){AlertDialog.Builder(this).setTitle("清除七项校准？").setPositiveButton("清除"){_,_->Session.pause();Profiles.clear(this,rotation(this));Session.profiles=emptyMap();Session.calMessage="已清除当前方向校准"}.setNegativeButton("取消",null).show()}
         shot=CheckBox(this).apply{text="允许张掌就绪后握拳截屏（默认关闭）";isChecked=false};p.addView(shot)
-        val hints=CheckBox(this).apply{text="控制应用内显示实时文字提示";isChecked=prefs.getBoolean("overlay",true);setOnCheckedChangeListener{_,v->Session.overlay=v;prefs.edit().putBoolean("overlay",v).apply();if(!v)HandAccess.current?.hide()}};p.addView(hints);Session.overlay=hints.isChecked
+        val hints=CheckBox(this).apply{text="控制应用内智能文字提示（闲置约2秒隐藏）";isChecked=prefs.getBoolean("overlay",true);setOnCheckedChangeListener{_,v->Session.overlay=v;prefs.edit().putBoolean("overlay",v).apply();if(!v)HandAccess.current?.hide()}};p.addView(hints);Session.overlay=hints.isChecked
         val top=CheckBox(this).apply{text="提示显示在屏幕顶部（默认底部）";isChecked=prefs.getBoolean("overlayTop",false);setOnCheckedChangeListener{_,v->Session.overlayTop=v;prefs.edit().putBoolean("overlayTop",v).apply();HandAccess.current?.hide()}};p.addView(top);Session.overlayTop=top.isChecked
         button("4. 识别测试（不会执行手势或截屏）"){
             if(!Session.running){toast("请先启动相机");return@button}
@@ -84,7 +84,7 @@ class MainActivity:Activity(){
         }
         button("暂停手势（相机仍运行）"){Session.pause();HandAccess.current?.hide()}
         button("停止相机与手势"){Session.pause();stopService(Intent(this,TrackingService::class.java));Session.status="已停止"}
-        button("复制诊断信息"){(getSystemService(CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("AirGesture A4",live.text.toString()+"\n"+status.text+"\n"+Session.diagnostic+"\n"+Session.report()));toast("已复制")}
+        button("复制诊断信息"){(getSystemService(CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("AirGesture A4R1",live.text.toString()+"\n"+status.text+"\n"+Session.diagnostic+"\n"+Session.report()));toast("已复制")}
         text("请将平板固定，手距相机约30–60cm开始测试，手掌完整可见。截图调用系统功能，可能被系统或应用拒绝；请勿用于敏感页面。锁屏、过热或相机异常自动停止。旋转会重新打开相机并读取该方向校准；未校准暂停。全局模式尝试控制当前活动应用窗口（包括桌面及分屏），系统授权、支付等敏感窗口、键盘、覆盖及过小窗口暂停。系统截屏限制不会被绕过。")
         setContentView(ScrollView(this).apply{addView(p)})
     }

@@ -5,7 +5,21 @@ import com.google.mediapipe.tasks.components.containers.NormalizedLandmark
 
 enum class Pose { NONE, OPEN, FIST, OTHER }
 enum class Action(val label:String,val output:String){
- UP("指尖向上转掌心","上滑"),DOWN("握拳张掌","下滑"),PALM_BACK("手心翻向手背","返回"),BACK_PALM("手背翻向手心","中心单击"),LEFT("横向手心左挥翻手背","左滑"),RIGHT("横向手背右挥翻手心","右滑"),SHOT("握拳截屏","截屏")
+ UP("指尖向上转掌心","下滑"),DOWN("握拳张掌","上滑"),PALM_BACK("手心翻向手背","返回"),BACK_PALM("手背翻向手心","中心单击"),LEFT("横向手心左挥翻手背","左滑"),RIGHT("横向手背右挥翻手心","右滑"),SHOT("握拳截屏","截屏")
+}
+// Keep Action identifiers stable so existing A4 calibration keys remain valid.
+fun Action.verticalSwipeY():Pair<Float,Float>?=when(this){
+ Action.UP->.30f to .72f
+ Action.DOWN->.73f to .31f
+ else->null
+}
+class GestureHintWindow(private val idleMs:Long=2000L){
+ private var lastActivity:Long?=null
+ fun reset(){lastActivity=null}
+ fun shouldShow(now:Long,activityAt:Long?,feedbackUntil:Long):Boolean{
+  if(activityAt!=null&&activityAt<=now&&now-activityAt<idleMs)lastActivity=maxOf(lastActivity?:activityAt,activityAt)
+  return now<feedbackUntil||(lastActivity?.let{now-it in 0 until idleMs}==true)
+ }
 }
 data class HandFrame(val at:Long,val pose:Pose,val x:Float=0f,val y:Float=0f,val face:Float=0f,val straight:Int=0,val curled:Int=0,val size:Float=0f,val fingerY:Float=0f,val tipY:Float=0f,val fingerX:Float=0f){
  val visible get()=pose!=Pose.NONE&&size>.045f
@@ -122,6 +136,7 @@ class HandGate(private val profiles:Map<Action,Profile>,private val screenshot:B
  private var smoothX=0f;private var smoothY=0f;private var lastFace=0f;private var crossed=false
  private var upOnly=false;private var downOnly=false;private var upHits=0
  private var horizontalOnly=false;private var maxTravel=0f
+ val hintActive get()=anchor!=null&&!needNeutral
  fun reset(){last=-1;since=-1;armed=-1;neutral=-1;anchor=null;candidate=null;hits=0;crossed=false;upOnly=false;downOnly=false;upHits=0;horizontalOnly=false;maxTravel=0f;status="请摆出手势起始姿势并停稳"}
  private fun finish(a:Action,now:Long):Action{reset();needNeutral=true;cooldown=now+1100;status="已识别 "+a.label;return a}
  fun sample(f:HandFrame,now:Long):Action?{
