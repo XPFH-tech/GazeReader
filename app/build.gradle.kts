@@ -5,6 +5,14 @@ plugins {
 android {
  namespace = "dev.xpfh.airgesture"
  compileSdk = 35
+ signingConfigs {
+  getByName("debug") {
+   enableV1Signing = true
+   enableV2Signing = true
+   enableV3Signing = false
+   enableV4Signing = false
+  }
+ }
  defaultConfig { applicationId = "dev.xpfh.airgesture"; minSdk = 31; targetSdk = 33; versionCode = 6; versionName = "3.0-A3"; ndk { abiFilters += "arm64-v8a" } }
  compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
  kotlinOptions { jvmTarget = "17" }
