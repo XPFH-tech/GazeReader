@@ -1,4 +1,17 @@
-# GazeReader · 眼动阅读
+# GestureReader · 隔空手势与眼动阅读
+
+面向 Android 手机和平板的非接触式交互项目，包含两个独立应用，首要适配设备为 MatePad Air 2023。均使用普通前置摄像头、本地视觉识别与 Android 无障碍服务，无需 Root。
+
+| 子项目 | 功能 | 源码与下载 |
+| --- | --- | --- |
+| **GazeReader** | 眼动翻页、横屏双页阅读、连续滚动 | [main 分支](../../tree/main) · [G3 构建](../../actions/workflows/build.yml) |
+| **AirGesture** | 隔空上下左右滑动、返回、中心单击、截图，七项独立校准 | [airgesture-a1 分支](../../tree/airgesture-a1) · [构建与下载](../../actions?query=branch%3Aairgesture-a1) |
+
+两个应用目前独立安装和构建，并非同一个 APK；不能同时占用前置相机。AirGesture A4R1 已通过云端构建，A5 智能低功耗方案尚未实现。以下为 GazeReader 主分支的详细说明；隔空手势说明见对应分支 README。
+
+---
+
+## GazeReader · 眼动阅读
 
 **1.3-G3 · 首个真机验证版本**
 
