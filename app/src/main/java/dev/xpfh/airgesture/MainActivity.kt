@@ -33,10 +33,10 @@ class MainActivity:Activity(){
         val f=Session.frame
         live.text=if(SystemClock.elapsedRealtime()<Session.feedbackUntil)Session.last+"\n"+Session.status else Session.status
         live.setTextColor(if(Session.status.startsWith("已就绪"))0xff13734a.toInt() else if(Session.status.contains("暂停")||Session.status.contains("失败"))0xffa04b14.toInt() else 0xff202124.toInt())
-        status.text="无障碍："+(if(HandAccess.current!=null)"已连接" else "未连接")+" | 相机："+(if(Session.running)"运行" else "停止")+"\n手掌："+Session.poseLabel(f?.pose)+" | 帧数："+Session.frames+"\n伸指："+(f?.straight?:0)+" / 弯指："+(f?.curled?:0)+" / 朝向："+String.format(java.util.Locale.US,"%.2f",f?.face?:0f)+" / 指向："+(if((f?.fingerY?:0f)>.35f)"下" else if((f?.fingerY?:0f)<-.35f)"上" else "侧")+String.format(java.util.Locale.US," (%.2f)",f?.fingerY?:0f)+"\n识别："+Session.detected+" | 实际手势回调/截屏请求："+Session.count+"\n最近动作："+Session.last
+        status.text="无障碍："+(if(HandAccess.current!=null)"已连接" else "未连接")+" | 相机："+(if(Session.running)"运行" else "停止")+"\n手掌："+Session.poseLabel(f?.pose)+" | 帧数："+Session.frames+"\n伸指："+(f?.straight?:0)+" / 弯指："+(f?.curled?:0)+" / 朝向："+String.format(java.util.Locale.US,"%.2f",f?.face?:0f)+" / 指向："+(if((f?.fingerY?:0f)>.35f)"下" else if((f?.fingerY?:0f)<-.35f)"上" else "侧")+String.format(java.util.Locale.US," (%.2f)",f?.fingerY?:0f)+" / 横向："+String.format(java.util.Locale.US,"%.2f",f?.fingerX?:0f)+"\n识别："+Session.detected+" | 实际手势回调/截屏请求："+Session.count+"\n最近动作："+Session.last
         val rot=rotation(this@MainActivity);val profiles=Profiles.load(this@MainActivity,rot)
-        calibrationStatus.text="当前方向："+rot+" · 已校准 "+profiles.size+"/5\n"+Session.calMessage
-        for((a,b) in calButtons){b.text=(if(profiles.containsKey(a))"已校准 · 重校 " else "校准 ")+a.label;b.isEnabled=Session.running&&Session.calibration==null}
+        calibrationStatus.text="当前方向："+rot+" · 已校准 "+profiles.size+"/7\n"+Session.calMessage
+        for((a,b) in calButtons){b.text=(if(profiles.containsKey(a))"已校准 · 重校 " else "校准 ")+a.label+" → "+a.output;b.isEnabled=Session.running&&Session.calibration==null}
         h.postDelayed(this,200)
     }}
     override fun onCreate(b:Bundle?){super.onCreate(b);selected=prefs.getString("pkg","")?:"";home();h.post(pulse)}
@@ -45,8 +45,8 @@ class MainActivity:Activity(){
         val p=LinearLayout(this).apply{orientation=1;setPadding(28,28,28,28)}
         fun text(s:String,n:Float=15f)=TextView(this).apply{text=s;textSize=n;p.addView(this)}
         fun button(s:String,action:()->Unit){p.addView(Button(this).apply{text=s;setOnClickListener{action()}})}
-        text("AirGesture 隔空手势 A2R2",25f)
-        text("本地手部识别 · 无需 Root。停止 GazeReader 相机后再使用。先完成五种手势的独立校准；同一方向使用同一只手。张掌停稳后上下挥手、翻掌或握拳，动作后移开手掌。")
+        text("AirGesture 隔空手势 A3",25f)
+        text("本地手部识别 · 无需 Root。停止 GazeReader 相机后再使用。先完成七种手势的独立校准；同一方向使用同一只手。张掌停稳后上下挥手、翻掌或握拳，动作后移开手掌。")
         live=text(Session.status,23f);live.gravity=android.view.Gravity.CENTER;live.setPadding(16,28,16,28);live.background=android.graphics.drawable.GradientDrawable().apply{cornerRadius=18*resources.displayMetrics.density;setColor(0xffedf3f7.toInt())}
         status=text("",15f)
         button("1. 启用隔空手势无障碍"){startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))}
@@ -58,9 +58,9 @@ class MainActivity:Activity(){
         speed=Spinner(this);speed.adapter=ArrayAdapter(this,android.R.layout.simple_spinner_dropdown_item,arrayOf("250 ms（快）","330 ms（推荐）","500 ms（稳）"));speed.setSelection(prefs.getInt("holdA2",1).coerceIn(0,2));p.addView(speed)
         text("3. 独立校准（不派发任何动作）",20f)
         calibrationStatus=text("未校准",16f)
-        text("上挥：手背朝镜头、指尖向下，等就绪后向上翻腕，终点手心朝镜头、指尖向上。普通翻掌保持指尖向上，避免与上挥冲突。旧上挥数据需重新校准；其他四项保留。请用同一只手，校准随方向保存。")
-        for(a in Action.entries){val b=Button(this).apply{text="校准 "+a.label;setOnClickListener{beginCalibration(a)}};calButtons[a]=b;p.addView(b)}
-        button("清除当前方向校准"){AlertDialog.Builder(this).setTitle("清除五项校准？").setPositiveButton("清除"){_,_->Session.pause();Profiles.clear(this,rotation(this));Session.profiles=emptyMap();Session.calMessage="已清除当前方向校准"}.setNegativeButton("取消",null).show()}
+        text("上挥：手背朝镜头、指尖向下 → 手心朝镜头、指尖向上。原地翻掌（返回/点击）：指尖向上，不横移。横向翻腕（左/右滑）：手指横向，整手向对应方向挥动并翻面。请用同一只手，校准随方向保存。")
+        for(a in Action.entries){val b=Button(this).apply{text="校准 "+a.label+" → "+a.output;setOnClickListener{beginCalibration(a)}};calButtons[a]=b;p.addView(b)}
+        button("清除当前方向校准"){AlertDialog.Builder(this).setTitle("清除七项校准？").setPositiveButton("清除"){_,_->Session.pause();Profiles.clear(this,rotation(this));Session.profiles=emptyMap();Session.calMessage="已清除当前方向校准"}.setNegativeButton("取消",null).show()}
         shot=CheckBox(this).apply{text="允许张掌就绪后握拳截屏（默认关闭）";isChecked=false};p.addView(shot)
         val hints=CheckBox(this).apply{text="控制应用内显示实时文字提示";isChecked=prefs.getBoolean("overlay",true);setOnCheckedChangeListener{_,v->Session.overlay=v;prefs.edit().putBoolean("overlay",v).apply();if(!v)HandAccess.current?.hide()}};p.addView(hints);Session.overlay=hints.isChecked
         val top=CheckBox(this).apply{text="提示显示在屏幕顶部（默认底部）";isChecked=prefs.getBoolean("overlayTop",false);setOnCheckedChangeListener{_,v->Session.overlayTop=v;prefs.edit().putBoolean("overlayTop",v).apply();HandAccess.current?.hide()}};p.addView(top);Session.overlayTop=top.isChecked
@@ -84,7 +84,7 @@ class MainActivity:Activity(){
         }
         button("暂停手势（相机仍运行）"){Session.pause();HandAccess.current?.hide()}
         button("停止相机与手势"){Session.pause();stopService(Intent(this,TrackingService::class.java));Session.status="已停止"}
-        button("复制诊断信息"){(getSystemService(CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("AirGesture A2R2",live.text.toString()+"\n"+status.text+"\n"+Session.diagnostic+"\n"+Session.report()));toast("已复制")}
+        button("复制诊断信息"){(getSystemService(CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("AirGesture A3",live.text.toString()+"\n"+status.text+"\n"+Session.diagnostic+"\n"+Session.report()));toast("已复制")}
         text("请将平板固定，手距相机约30–60cm开始测试，手掌完整可见。截图调用系统功能，可能被系统或应用拒绝；请勿用于敏感页面。锁屏、过热或相机异常自动停止。旋转会重新打开相机并读取该方向校准；未校准暂停。全局模式尝试控制当前活动应用窗口（包括桌面及分屏），系统授权、支付等敏感窗口、键盘、覆盖及过小窗口暂停。系统截屏限制不会被绕过。")
         setContentView(ScrollView(this).apply{addView(p)})
     }

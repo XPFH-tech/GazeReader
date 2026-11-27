@@ -111,20 +111,26 @@ class HandAccess:AccessibilityService(){
             if(ok){Session.count++;Session.feedback("系统已接受截屏请求")}else Session.feedback("系统拒绝截屏")
             return
         }
+        if(a==Action.PALM_BACK){
+            val ok=try{performGlobalAction(GLOBAL_ACTION_BACK)}catch(_:Exception){false}
+            if(ok){Session.count++;Session.feedback("系统已接受返回请求")}else Session.feedback("系统拒绝返回")
+            return
+        }
         fun x(f:Float)=b.left+b.width()*f
         fun y(f:Float)=b.top+b.height()*f
         val p=Path()
         when(a){
-            Action.PALM_BACK->{p.moveTo(x(.72f),y(.50f));p.lineTo(x(.30f),y(.50f))}
-            Action.BACK_PALM->{p.moveTo(x(.28f),y(.50f));p.lineTo(x(.70f),y(.50f))}
+            Action.LEFT->{p.moveTo(x(.72f),y(.50f));p.lineTo(x(.30f),y(.50f))}
+            Action.RIGHT->{p.moveTo(x(.28f),y(.50f));p.lineTo(x(.70f),y(.50f))}
+            Action.BACK_PALM->p.moveTo(x(.50f),y(.50f))
             Action.UP->{p.moveTo(x(.50f),y(.73f));p.lineTo(x(.50f),y(.31f))}
             Action.DOWN->{p.moveTo(x(.50f),y(.30f));p.lineTo(x(.50f),y(.72f))}
             else->return
         }
         busy=true;val generation=Session.epoch
-        Session.feedback("正在发送 "+a.label)
-        val ok=try{dispatchGesture(GestureDescription.Builder().addStroke(GestureDescription.StrokeDescription(p,0,320)).build(),object:GestureResultCallback(){
-            override fun onCompleted(g:GestureDescription?){busy=false;if(Session.epoch==generation&&Session.running){Session.count++;Session.feedback("手势已完成 · "+a.label+" · "+Session.count+" 次")}}
+        Session.feedback("正在发送 "+a.output)
+        val ok=try{dispatchGesture(GestureDescription.Builder().addStroke(GestureDescription.StrokeDescription(p,0,if(a==Action.BACK_PALM)80L else 320L)).build(),object:GestureResultCallback(){
+            override fun onCompleted(g:GestureDescription?){busy=false;if(Session.epoch==generation&&Session.running){Session.count++;Session.feedback("手势已完成 · "+a.output+" · "+Session.count+" 次")}}
             override fun onCancelled(g:GestureDescription?){busy=false;if(Session.epoch==generation&&Session.running)Session.feedback("手势已取消")}
         },null)}catch(_:Exception){false}
         if(!ok){busy=false;Session.feedback("系统拒绝 "+a.label)}
@@ -175,7 +181,7 @@ class TrackingService:LifecycleService(){
             if(blocked||gate==null){gate=HandGate(Session.profiles,Session.screenshot,Session.hold);blocked=false}
             val g=gate!!
             val action=g.sample(f,now)
-            if(action!=null){Session.detected++;if(test)Session.feedback("识别测试："+action.label+"（未执行）") else access?.send(Session.target,action,key)}
+            if(action!=null){Session.detected++;if(test)Session.feedback("识别测试："+action.label+" → "+action.output+"（未执行）") else access?.send(Session.target,action,key)}
             Session.status=g.status
             if(!test)access?.show(if(now<Session.feedbackUntil)Session.last+"\n请移开手掌，等待下一次识别" else Session.status+(if(g.status.startsWith("已就绪")&&Session.screenshot)"\n也可握拳截屏" else "")) else access?.hide()
         }

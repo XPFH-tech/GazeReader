@@ -5,7 +5,7 @@ plugins {
 android {
  namespace = "dev.xpfh.airgesture"
  compileSdk = 35
- defaultConfig { applicationId = "dev.xpfh.airgesture"; minSdk = 31; targetSdk = 33; versionCode = 5; versionName = "2.2-A2R2"; ndk { abiFilters += "arm64-v8a" } }
+ defaultConfig { applicationId = "dev.xpfh.airgesture"; minSdk = 31; targetSdk = 33; versionCode = 6; versionName = "3.0-A3"; ndk { abiFilters += "arm64-v8a" } }
  compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
  kotlinOptions { jvmTarget = "17" }
  androidResources { noCompress += "task" }
