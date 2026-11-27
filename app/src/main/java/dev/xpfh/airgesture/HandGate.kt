@@ -35,7 +35,8 @@ object HandFeatures {
     }
 }
 class HandGate(private val hold:Long=650L,private val distance:Float=.20f,private val screenshot:Boolean=false){
-    var status="张开手掌并停留";private set
+    var status="等待手掌 · 请张开四指";private set
+    private fun percent(elapsed:Long,total:Long)=((elapsed.coerceAtLeast(0)*100/total).coerceIn(0,100)/10*10).toInt()
     private var last=-1L;private var since=-1L;private var armed=-1L
     private var neutral=-1L;private var cooldown=0L;private var fist=-1L
     private var ax=0f;private var ay=0f;private var needNeutral=false
@@ -47,33 +48,36 @@ class HandGate(private val hold:Long=650L,private val distance:Float=.20f,privat
         if(last>=0&&f.at-last>500)reset()
         last=f.at
         if(needNeutral){
-            status="请移开手掌 · 冷却"
+            status="请移开手掌 · 等待冷却"
             if(f.pose==Pose.NONE||f.pose==Pose.OTHER){if(neutral<0)neutral=now;if(now-neutral>=400&&now>=cooldown){needNeutral=false;reset()}}else neutral=-1
             return null
         }
         if(armed>=0&&now-armed>2500){reset();needNeutral=true;cooldown=now;status="超时 · 请移开手掌";return null}
         if(armed<0){
-            if(f.pose!=Pose.OPEN){since=-1;status="张开手掌并停留";return null}
+            if(f.pose!=Pose.OPEN){since=-1;status=when(f.pose){Pose.NONE->"等待手掌 · 请将单手放入镜头";Pose.FIST->"检测到握拳 · 请先张开手掌";else->"手势未就绪 · 请伸直四指"};return null}
             if(since<0||hypot(f.x-ax,f.y-ay)>.055f){since=now;ax=f.x;ay=f.y}
-            status="检测到手掌 · 请停留"
-            if(now-since>=hold){armed=now;ax=f.x;ay=f.y;status="已就绪 · 挥手"}
+            status="已识别手掌 · 保持不动 "+percent(now-since,hold)+"%"
+            if(now-since>=hold){armed=now;ax=f.x;ay=f.y;status="已就绪 · 请向上下左右挥手"}
             return null
         }
         if(f.pose==Pose.FIST&&screenshot){
             if(fist<0)fist=now
-            status="握拳确认中"
+            status="握拳确认中 "+percent(now-fist,650L)+"%"
             if(now-fist>=650)return finish(Action.SHOT,now)
             return null
         }
         fist=-1
-        if(f.pose!=Pose.OPEN){reset();return null}
+        if(f.pose!=Pose.OPEN){reset();status=if(f.pose==Pose.FIST)"截屏未开启 · 请重新张掌" else "手掌已丢失 · 请重新张掌";return null}
         val dx=f.x-ax;val dy=f.y-ay
-        status="已就绪 · 挥手"
+        status="已就绪 · 请向上下左右挥手"
         if(now-armed<100)return null
         val a=when{
             abs(dx)>=distance&&abs(dx)>=abs(dy)*1.5f->if(dx>0)Action.RIGHT else Action.LEFT
             abs(dy)>=distance&&abs(dy)>=abs(dx)*1.5f->if(dy>0)Action.DOWN else Action.UP
             else->null
+        }
+        if(a==null&&maxOf(abs(dx),abs(dy))>=distance*.30f){
+            status=if(maxOf(abs(dx),abs(dy))>=distance&&minOf(abs(dx),abs(dy))*1.5f>maxOf(abs(dx),abs(dy)))"方向不明确 · 请沿直线挥手" else "已检测到移动 · 继续挥手 "+percent((maxOf(abs(dx),abs(dy))*1000).toLong(),(distance*1000).toLong())+"%"
         }
         return a?.let{finish(it,now)}
     }

@@ -12,7 +12,7 @@ import android.widget.*
 class MainActivity:Activity(){
     private val h=Handler(Looper.getMainLooper())
     private val prefs by lazy{getSharedPreferences("a1",0)}
-    private lateinit var status:TextView;private lateinit var chosen:TextView
+    private lateinit var status:TextView;private lateinit var chosen:TextView;private lateinit var live:TextView
     private lateinit var shot:CheckBox;private lateinit var speed:Spinner;private lateinit var sensitivity:Spinner
     private var selected=""
     private data class Entry(val pkg:String,val title:String,val component:ComponentName)
@@ -29,7 +29,9 @@ class MainActivity:Activity(){
     }
     private val pulse=object:Runnable{override fun run(){
         val f=Session.frame
-        status.text=Session.status+"\n无障碍："+(if(HandAccess.current!=null)"已连接" else "未连接")+" | 相机："+(if(Session.running)"运行" else "停止")+"\n手掌："+(f?.pose?.name?:"NONE")+" | 帧数："+Session.frames+"\n识别："+Session.detected+" | 实际手势回调/截屏请求："+Session.count+"\n最近动作："+Session.last
+        live.text=if(SystemClock.elapsedRealtime()<Session.feedbackUntil)Session.last+"\n"+Session.status else Session.status
+        live.setTextColor(if(Session.status.startsWith("已就绪"))0xff13734a.toInt() else if(Session.status.contains("暂停")||Session.status.contains("失败"))0xffa04b14.toInt() else 0xff202124.toInt())
+        status.text="无障碍："+(if(HandAccess.current!=null)"已连接" else "未连接")+" | 相机："+(if(Session.running)"运行" else "停止")+"\n手掌："+Session.poseLabel(f?.pose)+" | 帧数："+Session.frames+"\n识别："+Session.detected+" | 实际手势回调/截屏请求："+Session.count+"\n最近动作："+Session.last
         h.postDelayed(this,200)
     }}
     override fun onCreate(b:Bundle?){super.onCreate(b);selected=prefs.getString("pkg","")?:"";home();h.post(pulse)}
@@ -38,9 +40,10 @@ class MainActivity:Activity(){
         val p=LinearLayout(this).apply{orientation=1;setPadding(28,28,28,28)}
         fun text(s:String,n:Float=15f)=TextView(this).apply{text=s;textSize=n;p.addView(this)}
         fun button(s:String,action:()->Unit){p.addView(Button(this).apply{text=s;setOnClickListener{action()}})}
-        text("AirGesture 隔空手势 A1",25f)
+        text("AirGesture 隔空手势 A1R1",25f)
         text("本地手部识别 · 无需 Root。停止 GazeReader 相机后再使用。先张掌停留，看到已就绪后挥动。动作后移开手掌，等待冷却。")
-        status=text(Session.status,17f)
+        live=text(Session.status,23f);live.gravity=android.view.Gravity.CENTER;live.setPadding(16,28,16,28);live.background=android.graphics.drawable.GradientDrawable().apply{cornerRadius=18*resources.displayMetrics.density;setColor(0xffedf3f7.toInt())}
+        status=text("",15f)
         button("1. 启用隔空手势无障碍"){startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))}
         button("2. 启动前置相机"){
             if(checkSelfPermission(Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED)requestPermissions(arrayOf(Manifest.permission.CAMERA),10)
@@ -51,6 +54,8 @@ class MainActivity:Activity(){
         text("挥手距离阈值")
         sensitivity=Spinner(this);sensitivity.adapter=ArrayAdapter(this,android.R.layout.simple_spinner_dropdown_item,arrayOf("灵敏 14%","标准 20%","防误触 28%"));sensitivity.setSelection(prefs.getInt("dist",1).coerceIn(0,2));p.addView(sensitivity)
         shot=CheckBox(this).apply{text="允许张掌就绪后握拳截屏（默认关闭）";isChecked=false};p.addView(shot)
+        val hints=CheckBox(this).apply{text="控制应用内显示实时文字提示";isChecked=prefs.getBoolean("overlay",true);setOnCheckedChangeListener{_,v->Session.overlay=v;prefs.edit().putBoolean("overlay",v).apply();if(!v)HandAccess.current?.hide()}};p.addView(hints);Session.overlay=hints.isChecked
+        val top=CheckBox(this).apply{text="提示显示在屏幕顶部（默认底部）";isChecked=prefs.getBoolean("overlayTop",false);setOnCheckedChangeListener{_,v->Session.overlayTop=v;prefs.edit().putBoolean("overlayTop",v).apply();HandAccess.current?.hide()}};p.addView(top);Session.overlayTop=top.isChecked
         button("3. 识别测试（不会执行手势或截屏）"){
             if(!Session.running){toast("请先启动相机");return@button}
             configure();Session.pause();Session.enabled=true;Session.after=SystemClock.elapsedRealtime()+500
@@ -65,7 +70,7 @@ class MainActivity:Activity(){
         }
         button("暂停手势（相机仍运行）"){Session.pause();HandAccess.current?.hide()}
         button("停止相机与手势"){Session.pause();stopService(Intent(this,TrackingService::class.java));Session.status="已停止"}
-        button("复制诊断信息"){(getSystemService(CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("AirGesture A1",status.text.toString()+"\n"+Session.report()));toast("已复制")}
+        button("复制诊断信息"){(getSystemService(CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("AirGesture A1R1",live.text.toString()+"\n"+status.text+"\n"+Session.diagnostic+"\n"+Session.report()));toast("已复制")}
         text("请将平板固定，手距相机约30–60cm开始测试，手掌完整可见。截图调用系统功能，可能被系统或应用拒绝；请勿用于敏感页面。锁屏、旋转、过热、15分钟或相机异常自动停止。小窗、分屏、键盘及非目标前台不发送手势。")
         setContentView(ScrollView(this).apply{addView(p)})
     }

@@ -12,4 +12,6 @@ class HandGateTest {
     @Test fun gapDisarms(){val g=HandGate();arm(g);assertNull(sample(g,1500,x=.9f))}
     @Test fun staleDisarms(){val g=HandGate();arm(g);assertNull(g.sample(HandFrame(900,Pose.OPEN,.9f,.5f),1501))}
     @Test fun fourDirections(){for((a,xy) in listOf(Action.LEFT to (.2f to .5f),Action.RIGHT to (.8f to .5f),Action.UP to (.5f to .2f),Action.DOWN to (.5f to .8f))){val g=HandGate();arm(g);assertEquals(a,sample(g,950,x=xy.first,y=xy.second))}}
+    @Test fun textShowsProgressAndReady(){val g=HandGate();assertNull(sample(g,100,Pose.NONE));assertTrue(g.status.contains("等待手掌"));sample(g,200);sample(g,500);assertTrue(g.status.contains("保持不动")&&g.status.contains("%"));sample(g,800);sample(g,900);assertTrue(g.status.contains("已就绪"));sample(g,1000,x=.6f);assertTrue(g.status.contains("移动"));assertEquals(Action.RIGHT,sample(g,1100,x=.8f))}
+    @Test fun fistWithoutPermissionShowsReason(){val g=HandGate();arm(g);assertNull(sample(g,900,Pose.FIST));assertTrue(g.status.contains("截屏未开启"))}
 }
